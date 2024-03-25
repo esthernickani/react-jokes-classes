@@ -5,38 +5,46 @@ import Joke from "./Joke";
 import "./JokeList.css";
 
 /** List of jokes. */
-const JokeList = () => {
+const JokeList = ({numJokesToGet=5}) => {
   const [ jokes, addJokes ] = useState([])
-  const [ seenJokes, addSeenJokes] = useState([])
   const [ loading, setLoading ] = useState(true)
 
-  const getJokes = async () => {
-    let res = await axios.get("https://icanhazdadjoke.com", {
-          headers: { Accept: "application/json" }
-        });
-    let { ...joke } = res.data
-
-    if (!seenJokes.includes(joke.id)) {
-      addSeenJokes(jokeIds => [...jokeIds, joke.id])
-      addJokes(jokes => [...jokes, {key: uuid(), id: uuid(), text: joke.text, votes: 0}])
-    }
+  const vote = (id, voteValue) => {
+    addJokes(jokes => jokes.map(j => j.id == id? {...j, votes: j.votes + voteValue} : j))
   }
 
   useEffect(() => {
-    console.log('effect')
-    let promises = []
-    for (let i = 0; i < 5; i++) {
-      promises.push(getJokes())
+    const getJokes = async () => {
+      let jokesArr = [...jokes]
+      let seenJokes = new Set()
+
+      while(jokesArr.length < numJokesToGet) {
+        let res = await axios.get("https://icanhazdadjoke.com", {
+          headers: { Accept: "application/json" }
+        });
+
+        let { ...joke } = res.data
+
+        if (!seenJokes.has(joke.id)) {
+          seenJokes.add(joke.id)
+          jokesArr.push({key: uuid(), id: uuid(), text: joke.joke, vote:vote, votes: 0})
+        }
+      }
+
+      addJokes(jokes => [...jokes, ...jokesArr])
+      setLoading(false)
+
     }
 
-    Promise.all(promises).then(() => {
-      setLoading(loading => !loading)
-    })
-
-
+    if (jokes.length <= 5) getJokes()
+    console.log(jokes)
   }, [])
 
-  console.log(jokes)
+
+  const currentJokes = jokes.map(({id, text, vote, votes}) => (
+    <Joke id={id} text={text} vote={vote} votes={votes}/>
+  ))
+
 
   return (
     <div>
@@ -45,6 +53,7 @@ const JokeList = () => {
               <i className="fas fa-4x fa-spinner fa-spin" />
         </div>
       }
+      {!loading && currentJokes}
     </div>
 
   )
